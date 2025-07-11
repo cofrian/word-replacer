@@ -21,6 +21,7 @@ def reemplazar_en_documento(ruta_entrada, ruta_salida, reemplazos):
                     if buscar in celda.text:
                         celda.text = celda.text.replace(buscar, reemplazar)
 
+    # Guardar documento modificado
     doc.save(ruta_salida)
 
 # --- Streamlit UI ---
@@ -55,26 +56,36 @@ if st.button("🚀 Procesar documentos"):
             with zipfile.ZipFile(archivo_zip, 'r') as zip_ref:
                 zip_ref.extractall(temp_input)
 
-            # Procesar documentos
-            archivos = [f for f in os.listdir(temp_input) if f.endswith(".docx")]
-            for archivo in archivos:
-                ruta_docx = os.path.join(temp_input, archivo)
-                nombre_modificado = f"MOD_{archivo}"
-                ruta_modificado = os.path.join(temp_output, nombre_modificado)
-                reemplazar_en_documento(ruta_docx, ruta_modificado, reemplazos)
+            # Procesar documentos en todas las carpetas y subcarpetas
+            for root, dirs, files in os.walk(temp_input):
+                for archivo in files:
+                    if archivo.endswith(".docx"):
+                        ruta_docx = os.path.join(root, archivo)
 
-            # Crear ZIP con resultados
+                        # Mantener estructura de carpetas en salida
+                        relative_path = os.path.relpath(root, temp_input)
+                        output_dir = os.path.join(temp_output, relative_path)
+                        os.makedirs(output_dir, exist_ok=True)
+
+                        nombre_modificado = f"MOD_{archivo}"
+                        ruta_modificado = os.path.join(output_dir, nombre_modificado)
+
+                        reemplazar_en_documento(ruta_docx, ruta_modificado, reemplazos)
+
+            # Crear ZIP con resultados y mantener estructura de carpetas
             resultado_zip = "resultado.zip"
             with zipfile.ZipFile(resultado_zip, 'w') as zipf:
                 for root, dirs, files in os.walk(temp_output):
                     for file in files:
-                        zipf.write(os.path.join(root, file), file)
+                        abs_file_path = os.path.join(root, file)
+                        relative_file_path = os.path.relpath(abs_file_path, temp_output)
+                        zipf.write(abs_file_path, relative_file_path)
 
             # Mostrar enlace de descarga
             with open(resultado_zip, "rb") as f:
                 st.download_button("⬇️ Descargar Word modificados (ZIP)", f, file_name="resultado.zip")
 
-            # Limpiar temporales
+            # Limpiar carpetas temporales
             shutil.rmtree(temp_input)
             shutil.rmtree(temp_output)
             os.remove(resultado_zip)
